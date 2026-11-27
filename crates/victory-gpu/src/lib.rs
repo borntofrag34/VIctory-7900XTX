@@ -129,10 +129,10 @@ pub fn frames_begun() -> u64 {
     frame::current()
 }
 #[cfg(windows)]
-pub use inplace::{title_memory_freeing, title_memory_section, title_memory_section_gone, title_memory_view};
+pub use inplace::{title_memory_freeing, title_memory_home, title_memory_section, title_memory_section_gone, title_memory_view};
 #[cfg(windows)]
 pub use watch::{
     kernel_writing, title_memory_allocated, title_memory_freed, title_memory_reading, title_memory_remapped,
-    title_memory_remapping, title_memory_splitting, title_memory_unmapping, title_memory_written,
+    title_memory_remapping, title_memory_splitting, title_memory_unmapping, title_memory_written, title_view_space,
     writing as kernel_will_write,
 };

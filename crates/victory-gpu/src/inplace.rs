@@ -578,6 +578,10 @@ fn stretch_in(views: &BTreeMap<usize, (usize, usize, u64)>, at: usize, len: usiz
 /// `crate::watch::title_memory_reading`: until it lets go the title sees
 /// the same pages at `at`.
 pub(crate) fn beside(at: usize, len: usize) -> Option<usize> {
+    // (Under Wine: the section's file does not hold these pages' bytes.)
+    if home_touches(at, len) {
+        return None;
+    }
     let known = {
         let v = views();
         let Cover::Run(section, offset) = cover_in(&v.views, at, len) else {
@@ -614,6 +618,9 @@ pub(crate) fn beside(at: usize, len: usize) -> Option<usize> {
 /// in no view of a section, or in very many. While the caller holds
 /// `crate::watch::title_memory_reading`.
 pub(crate) fn beside_page(page: usize) -> Option<(usize, [usize; 8])> {
+    if home_touches(page, K64) {
+        return None;
+    }
     for asked in [false, true] {
         {
             let v = views();
@@ -650,8 +657,187 @@ pub(crate) fn private_whole(at: usize, len: usize) -> bool {
     n != 0
         && info.State == mem::MEM_COMMIT
         && info.Type == mem::MEM_PRIVATE
+        && !crate::watch::in_view_space(at)
         && info.Protect == mem::PAGE_READWRITE
         && (info.BaseAddress as usize).saturating_add(info.RegionSize) >= at.saturating_add(len)
+}
+
+/// Under Wine: title memory that is physical pages shown as private memory
+/// of their own at the title's address, not as their section's file
+/// (`victory-hle`'s `xmem`, for renderer port 1): start and end, in order,
+/// those that touch as one. None on Windows.
+///
+/// Why: vkd3d-proton opens a heap on memory by importing it into Vulkan
+/// (`VK_EXT_external_memory_host`), and where the import fails it gives the
+/// heap memory of its own and says nothing. With RADV it fails for a view of
+/// a section and for a section's file shown with `mmap`, and works for
+/// private memory ([`view_is_shared`]; `docs/linux-wine.md`): a heap opened
+/// on a view of ours read as zeros on the card, and every frame of renderer
+/// port 1 was black. Here the heap is opened where the title has the pages
+/// ([`crate::port`]).
+///
+/// What follows from it: such memory is never guarded (`crate::watch`: while
+/// a page of an imported heap is read-only the kernel refuses every
+/// submission and the device is lost), and no view of ours is beside it
+/// ([`beside`]): the section's file does not hold its bytes.
+static HOMES: std::sync::RwLock<Vec<(usize, usize)>> = std::sync::RwLock::new(Vec::new());
+static HOMES_ANY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The runtime shows physical pages as memory of their own at `[at, at +
+/// len)` (`there`), or is about to take them away or to show them as their
+/// section's file again ([`HOMES`]).
+pub fn title_memory_home(at: usize, len: usize, there: bool) {
+    if !there {
+        // What is in place there goes first: its heap is on these pages.
+        title_memory_freeing(at, len);
+    }
+    let (start, end) = (at, at.saturating_add(len));
+    let mut homes = HOMES.write().unwrap_or_else(|e| e.into_inner());
+    let mut now: Vec<(usize, usize)> = Vec::with_capacity(homes.len() + 2);
+    for &(a, b) in homes.iter() {
+        if a < start.min(b) {
+            now.push((a, start.min(b)));
+        }
+        if end.max(a) < b {
+            now.push((end.max(a), b));
+        }
+    }
+    if there && start < end {
+        now.push((start, end));
+    }
+    now.sort_unstable();
+    let mut joined: Vec<(usize, usize)> = Vec::with_capacity(now.len());
+    for (a, b) in now {
+        match joined.last_mut() {
+            Some(last) if last.1 == a => last.1 = b,
+            _ => joined.push((a, b)),
+        }
+    }
+    *homes = joined;
+    HOMES_ANY.store(!homes.is_empty(), Ordering::Relaxed);
+}
+
+/// Whether all of `[at, at + len)` is pages at home ([`HOMES`]) that a heap
+/// may be opened on, and that the guards therefore leave alone (not those
+/// given up, [`home_given_up`]).
+pub(crate) fn at_home(at: usize, len: usize) -> bool {
+    if !HOMES_ANY.load(Ordering::Relaxed) {
+        return false;
+    }
+    let end = at.saturating_add(len.max(1));
+    {
+        let homes = HOMES.read().unwrap_or_else(|e| e.into_inner());
+        let n = homes.partition_point(|h| h.0 <= at);
+        if n == 0 || end > homes[n - 1].1 {
+            return false;
+        }
+    }
+    !GIVEN_UP.read().unwrap_or_else(|e| e.into_inner()).iter().any(|g| g.0 < end && at < g.1)
+}
+
+/// Stretches of pages at home that no heap is opened on, for good: the card
+/// read zeros in the heap the host opened there (`crate::port`'s
+/// `open_at_home`).
+static GIVEN_UP: std::sync::RwLock<Vec<(usize, usize)>> = std::sync::RwLock::new(Vec::new());
+
+/// No heap is opened on `[at, at + len)`, pages at home, any more: from here
+/// on [`at_home`] says no for them, so that the guards take them for the
+/// views they stand for and can tell what the title writes there. They stay
+/// memory of their own ([`home_touches`]: no view of ours beside them).
+pub(crate) fn home_given_up(at: usize, len: usize) {
+    GIVEN_UP.write().unwrap_or_else(|e| e.into_inner()).push((at, at.saturating_add(len)));
+    tracing::warn!(
+        start = format_args!("{at:#x}"),
+        len,
+        "renderer port 1 under Wine: no heap is opened on these pages any more: copied as before, and guarded as views are"
+    );
+}
+
+/// Whether any of `[at, at + len)` is pages at home ([`HOMES`]).
+pub(crate) fn home_touches(at: usize, len: usize) -> bool {
+    if !HOMES_ANY.load(Ordering::Relaxed) {
+        return false;
+    }
+    let end = at.saturating_add(len.max(1));
+    let homes = HOMES.read().unwrap_or_else(|e| e.into_inner());
+    let n = homes.partition_point(|h| h.1 <= at);
+    homes.get(n).is_some_and(|h| h.0 < end)
+}
+
+/// Whether a heap opened on a view of a section is that section's memory to
+/// the card: a view of a section of our own is opened, a buffer placed in it,
+/// and the card asked what it reads there. Once, with a queue of its own
+/// ([`Rig`]). `false` where the host opens the heap on memory of its own
+/// ([`HOMES`]), and where the question cannot be put.
+pub(crate) fn view_is_shared(device: &ID3D12Device) -> bool {
+    static SHARED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *SHARED.get_or_init(|| {
+        let asked = (|| -> windows::core::Result<bool> {
+            let mut rig = Rig::new(device)?;
+            // SAFETY: a section and a view of our own, let go below; every
+            // address used lies in the view.
+            unsafe {
+                let invalid = windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+                let section = mem::CreateFileMappingW(invalid, std::ptr::null(), mem::PAGE_READWRITE | mem::SEC_COMMIT, 0, K64 as u32, std::ptr::null());
+                let view = if section.is_null() { std::ptr::null_mut() } else { mem::MapViewOfFile(section, mem::FILE_MAP_WRITE, 0, 0, K64).Value.cast::<u8>() };
+                let seen = if view.is_null() {
+                    Err(windows::core::Error::from_thread())
+                } else {
+                    fill(view, K64, 5);
+                    open(device, From::Part(view as usize, K64)).and_then(|heap| {
+                        let buffer = place(device, &heap, 0, K64 as u64)?;
+                        Ok(same(view, &rig.fetch(&buffer, 0, K64)?))
+                    })
+                };
+                if !view.is_null() {
+                    mem::UnmapViewOfFile(mem::MEMORY_MAPPED_VIEW_ADDRESS { Value: view.cast() });
+                }
+                if !section.is_null() {
+                    windows_sys::Win32::Foundation::CloseHandle(section);
+                }
+                seen
+            }
+        })();
+        match asked {
+            Ok(shared) => {
+                tracing::info!(shared, "a host heap opened on a view of a section: whether the card reads the view's bytes there");
+                shared
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "a host heap on a view of a section could not be tried: taken as not the view's memory");
+                false
+            }
+        }
+    })
+}
+
+/// Whether the card reads the memory's bytes through `heap`, opened on
+/// `[memory, memory + bytes)`: the first 4 KiB of its first 32 MiB that are
+/// not all zeros are fetched through a buffer placed there and compared with
+/// the memory as it is before and after. `Some(false)`: the card reads zeros
+/// there (the host gave the heap memory of its own, [`HOMES`]). `None`:
+/// nothing to tell by (all zeros so far, or changing under the look).
+pub(crate) fn heap_shows(device: &ID3D12Device, heap: &ID3D12Heap, memory: usize, bytes: usize) -> Option<bool> {
+    const PAGE: usize = 4096;
+    // No mapping change while the memory is read; not waited for (the caller
+    // may hold what such a change waits for).
+    let _reading = crate::watch::title_memory_reading_now()?;
+    let look = bytes.min(32 << 20) / PAGE * PAGE;
+    // SAFETY: committed title memory the caller opened the heap on, which
+    // stays mapped while `_reading` is held.
+    let all = unsafe { std::slice::from_raw_parts(memory as *const u8, look) };
+    let at = all.chunks_exact(PAGE).position(|page| page.iter().any(|b| *b != 0))? * PAGE;
+    let before = all[at..at + PAGE].to_vec();
+    let from = at / K64 * K64;
+    let buffer = place(device, heap, from as u64, K64.min(bytes - from) as u64).ok()?;
+    let got = Rig::new(device).and_then(|mut rig| rig.fetch(&buffer, (at - from) as u64, PAGE)).ok()?;
+    if got == before || got == all[at..at + PAGE] {
+        Some(true)
+    } else if got.iter().all(|b| *b == 0) {
+        Some(false)
+    } else {
+        None
+    }
 }
 
 fn hr<T>(result: &windows::core::Result<T>) -> String {
