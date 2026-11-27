@@ -500,6 +500,90 @@ impl Module {
         self.blocks[block].term = Some(t);
     }
 
+    /// Whether the module declares a read of another lane's value
+    /// (`WaveReadLaneAt`, `QuadReadLaneAt`).
+    pub fn reads_lanes(&self) -> bool {
+        let reads = ["dx.op.waveReadLaneAt", "dx.op.quadReadLaneAt"];
+        self.funcs.iter().any(|f| reads.iter().any(|r| f.name.starts_with(r)))
+    }
+
+    /// Gives every loop one back edge: a header that several blocks branch
+    /// back to gets a latch of its own. Those blocks branch to it, it joins
+    /// what each of them brought for the header's phis, and it alone
+    /// branches back (the form LLVM's loop-simplify gives a loop).
+    ///
+    /// For vkd3d-proton: its dxil-spirv (114e664, of vkd3d-proton 2576c0b4)
+    /// walks the graph of a module that reads lanes before its structuriser
+    /// has made the back edges one, keeps the second as a forward edge and
+    /// never comes back from its search for dominators. The thread making
+    /// the pipeline ran out of stack whatever its size, and Wine ended it
+    /// without a word (`docs/linux-wine.md`, cause 2: the six programs that
+    /// trace shadow rays).
+    pub fn single_latches(&mut self) {
+        if self.blocks.is_empty() {
+            return;
+        }
+        // A back edge goes to a block the depth-first walk is still inside.
+        let mut state = vec![0u8; self.blocks.len()];
+        let mut loops: Vec<(usize, Vec<usize>)> = Vec::new();
+        let mut stack = vec![(0usize, 0usize)];
+        state[0] = 1;
+        while let Some(top) = stack.last_mut() {
+            let (b, k) = *top;
+            top.1 += 1;
+            match successors(self.blocks[b].term).get(k) {
+                Some(&s) if state[s] == 0 => {
+                    state[s] = 1;
+                    stack.push((s, 0));
+                }
+                Some(&s) if state[s] == 1 => match loops.iter_mut().find(|(h, _)| *h == s) {
+                    Some((_, from)) if from.contains(&b) => {}
+                    Some((_, from)) => from.push(b),
+                    None => loops.push((s, vec![b])),
+                },
+                Some(_) => {}
+                None => {
+                    state[b] = 2;
+                    stack.pop();
+                }
+            }
+        }
+        for (head, from) in loops.into_iter().filter(|(_, from)| from.len() > 1) {
+            let latch = self.new_block();
+            self.terminate(latch, Term::Br(head));
+            for phi in self.blocks[head].phis.clone() {
+                let op = &mut self.insts[phi as usize].op;
+                let Op::Phi(incoming) = std::mem::replace(op, Op::Phi(Vec::new())) else {
+                    unreachable!("a block's phis are phis")
+                };
+                let (round, mut rest): (Vec<_>, Vec<_>) =
+                    incoming.into_iter().partition(|(_, b)| from.contains(b));
+                match round[..] {
+                    [] => {}
+                    // One value whichever way round: it is defined before
+                    // every one of those blocks ends, so before the latch.
+                    [(v, _), ref more @ ..] if more.iter().all(|&(x, _)| x == v) => {
+                        rest.push((v, latch));
+                    }
+                    _ => {
+                        let joined = self.phi(latch, self.insts[phi as usize].ty);
+                        self.set_phi(joined, round);
+                        rest.push((joined, latch));
+                    }
+                }
+                self.insts[phi as usize].op = Op::Phi(rest);
+            }
+            let to = |t: usize| if t == head { latch } else { t };
+            for &b in &from {
+                self.blocks[b].term = match self.blocks[b].term {
+                    Some(Term::Br(t)) => Some(Term::Br(to(t))),
+                    Some(Term::CondBr(c, t, f)) => Some(Term::CondBr(c, to(t), to(f))),
+                    other => other,
+                };
+            }
+        }
+    }
+
     pub fn md_str(&mut self, s: &str) -> Md {
         self.mds.push(MdDef::Str(s.into()));
         Md(self.mds.len() as u32 - 1)
@@ -1233,6 +1317,66 @@ mod tests {
             m.write()
         };
         assert_eq!(build(false), build(true));
+    }
+
+    #[test]
+    fn a_loop_with_two_back_edges_gets_one_latch() {
+        // head -> first -> second -> exit, with `first` and `second` both
+        // branching back to `head`; `i` steps on either way round, `kept`
+        // comes round as itself.
+        let mut m = Module::default();
+        let i32t = m.int(32);
+        let void = m.void();
+        let fty = m.func_ty(void, vec![i32t]);
+        let f = m.function("sink", fty, Some(Attr::NoUnwind), false);
+        let main_ty = m.func_ty(void, vec![]);
+        m.function("main", main_ty, None, true);
+        let (entry, head, first, second, exit) =
+            (m.new_block(), m.new_block(), m.new_block(), m.new_block(), m.new_block());
+        let (z, one, ten) = (m.i32(0), m.i32(1), m.i32(10));
+        m.terminate(entry, Term::Br(head));
+        let (i, kept) = (m.phi(head, i32t), m.phi(head, i32t));
+        m.terminate(head, Term::Br(first));
+        let a = m.bin(first, Bin::Add, i, one);
+        let c = m.cmp(first, pred::IULT, a, ten);
+        m.terminate(first, Term::CondBr(c, head, second));
+        let b = m.bin(second, Bin::Add, a, kept);
+        let d = m.cmp(second, pred::IULT, b, ten);
+        m.terminate(second, Term::CondBr(d, head, exit));
+        m.set_phi(i, vec![(z, entry), (a, first), (b, second)]);
+        m.set_phi(kept, vec![(one, entry), (kept, first), (kept, second)]);
+        let _ = m.call(exit, f, vec![b]);
+        m.terminate(exit, Term::Ret);
+
+        m.single_latches();
+        let latch = m.blocks.len() - 1;
+        assert_eq!(latch, exit + 1);
+        let targets = |m: &Module, b: usize| successors(m.blocks[b].term).to_vec();
+        assert_eq!(targets(&m, latch), [head]);
+        assert_eq!(targets(&m, first), [latch, second]);
+        assert_eq!(targets(&m, second), [latch, exit]);
+        let incoming = |m: &Module, v: V| {
+            let V::Inst(n) = v else { unreachable!() };
+            let Op::Phi(inc) = &m.insts[n as usize].op else { unreachable!() };
+            inc.clone()
+        };
+        let [joined] = m.blocks[latch].phis[..] else { panic!("one join in the latch") };
+        assert_eq!(incoming(&m, V::Inst(joined)), vec![(a, first), (b, second)]);
+        assert_eq!(incoming(&m, i), vec![(z, entry), (V::Inst(joined), latch)]);
+        assert_eq!(incoming(&m, kept), vec![(one, entry), (kept, latch)]);
+        // One back edge now: nothing more to do, and the module writes.
+        let written = m.write();
+        m.single_latches();
+        assert_eq!(m.blocks.len(), latch + 1);
+        assert_eq!(m.write(), written);
+    }
+
+    #[test]
+    fn a_loop_with_one_back_edge_keeps_its_shape() {
+        let mut m = synthetic(4, 3, 2);
+        let written = m.write();
+        m.single_latches();
+        assert_eq!(m.write(), written);
     }
 
     #[test]

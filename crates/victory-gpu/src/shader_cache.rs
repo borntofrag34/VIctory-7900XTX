@@ -139,6 +139,12 @@ fn build() -> [u8; 32] {
         if victory_shader::emit::constants_raw() {
             bytes.extend_from_slice(b"VICTORY_PORT_CBV=1");
         }
+        // One latch a loop where lanes are read (`VICTORY_SINGLE_LATCH`, on
+        // under Wine). Only when on, likewise: Windows keeps its key.
+        match victory_shader::emit::single_latch() {
+            0 => {}
+            stages => bytes.extend_from_slice(format!("VICTORY_SINGLE_LATCH={stages}").as_bytes()),
+        }
         bytes
     });
     let mut hash = blake3::Hasher::new();

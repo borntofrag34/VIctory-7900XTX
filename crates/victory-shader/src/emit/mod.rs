@@ -201,6 +201,59 @@ pub fn builder_bounds() -> bool {
     *ON.get_or_init(|| std::env::var_os("VICTORY_BVH_BOUNDS").is_none_or(|v| v != "0"))
 }
 
+/// Whether a loop that several blocks branch back to gets one latch they all
+/// go through, in a program that reads lanes (`bitcode`'s `single_latches`).
+/// The dxil-spirv of vkd3d-proton 2576c0b4 never comes back from such a
+/// program with the loops as the console has them: the thread making the
+/// pipeline runs out of stack whatever its size (41 compute programs of the
+/// title, its traced shadows among them), and 583 pixel programs come out as
+/// other SPIR-V than a mended dxil-spirv gives (`docs/linux-wine.md`).
+/// `VICTORY_SINGLE_LATCH`:
+/// - unset: on under Wine, off on Windows, whose drivers take the loops as
+///   they are (nothing was run there with it on, and AMD's hung on a latch
+///   of another kind: `bitcode`'s `write`).
+/// - a number: a set of [`latch`]'s bits; 1 compute programs, 2 the others,
+///   `0` none.
+///
+/// With the compute programs running under Wine the lamps' light is back;
+/// `0` is the picture as before. The heads that people other than the
+/// heroine lack in about every other run are not its doing: they are missing
+/// as often with `0`, where the dark hid them (`docs/linux-wine.md`).
+///
+/// Part of the translation: the shader cache keys on it (`victory-gpu`'s
+/// does, when it is not 0).
+pub fn single_latch() -> u32 {
+    static BITS: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    *BITS.get_or_init(|| {
+        let value = std::env::var("VICTORY_SINGLE_LATCH").ok();
+        parse_set(value.as_deref(), if on_wine() { latch::ALL } else { 0 }, latch::ALL)
+    })
+}
+
+/// The bits of [`single_latch`].
+pub mod latch {
+    /// Compute programs.
+    pub const COMPUTE: u32 = 1;
+    /// Programs of the other stages (those that read lanes are pixel programs).
+    pub const OTHERS: u32 = 2;
+    pub const ALL: u32 = 3;
+}
+
+/// Whether the host is Wine (its ntdll says which version).
+fn on_wine() -> bool {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
+        // SAFETY: plain lookups in ntdll, always loaded; both names end in a zero.
+        unsafe {
+            let ntdll = GetModuleHandleA(c"ntdll.dll".as_ptr().cast());
+            !ntdll.is_null() && GetProcAddress(ntdll, c"wine_get_version".as_ptr().cast()).is_some()
+        }
+    }
+    #[cfg(not(windows))]
+    false
+}
+
 /// The clean-up passes that run over a translated program before it is
 /// written (`bitcode::opt`): a set of that module's pass bits. Every pass
 /// is exact, so the switch is for telling a translator fault from a
@@ -300,6 +353,7 @@ pub fn translation_fingerprint() -> Vec<u8> {
     out.extend_from_slice(&loop_limit().to_le_bytes());
     out.push(group_sync());
     out.extend_from_slice(&shader_opt().to_le_bytes());
+    out.extend_from_slice(&single_latch().to_le_bytes());
     out
 }
 

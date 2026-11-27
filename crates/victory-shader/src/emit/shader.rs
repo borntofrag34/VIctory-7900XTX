@@ -908,6 +908,13 @@ impl Shader {
         self.m.named_md("dx.shaderModel", vec![sm]);
         self.m.named_md("dx.entryPoints", vec![entry]);
 
+        // One back edge a loop where lanes are read: vkd3d-proton's
+        // dxil-spirv does not come back from the others (`single_latches`;
+        // `VICTORY_SINGLE_LATCH`, on under Wine).
+        let stage = if kind == 5 { super::latch::COMPUTE } else { super::latch::OTHERS };
+        if super::single_latch() & stage != 0 && self.m.reads_lanes() {
+            self.m.single_latches();
+        }
         let bitcode = self.m.write();
         super::bitcode::census::note(&self.m, &bitcode);
         let mut dxil = Vec::with_capacity(24 + bitcode.len());
