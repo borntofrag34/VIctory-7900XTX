@@ -1123,6 +1123,16 @@ page without a copy, `xmem` tests 22 of 22 under Wine.
 The in-run switches of 0e193cb2 and 3ff9fde7 broke a build without `diagnostics`
 (`crate::ab` is only there with it); they are behind it now, like the others.
 
+### Thin LTO for the development build (runs 269-270)
+
+zocram4cc's best step (play-fast9, -2.2 ms) joined thin LTO, x86-64-v3 and a Wine with
+`NtGetWriteWatch` outside its lock. x86-64-v3 is here already; the `diag` profile (the one
+the launcher runs) has `lto = false` and 16 codegen units, release has thin LTO and one.
+The `diag` profile with release's (runs 269 and 270, 420 s each, prison): 28.7 against
+29.2 ms a frame, the submitting thread 22.7 against 22.8 ms, preparing 10.8 against 11.0;
+within one pair's noise, for a build of 1 min 41 s instead of 18 s. Left as it is. Their
+Wine change is outside this tree.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
