@@ -27,6 +27,10 @@
 #                                     CPU through the bus (no copy to send, no list of changes):
 #                                     28.2 ms a frame against 31.6, the submitting thread 16.9
 #                                     against 21.5 (runs 237-240, the prison; after zocram4cc)
+#   VICTORY_AMBIENT_SPECULAR=1        reflections whose rays find nothing (no ray tracing) take
+#                                     the room's light along the reflected direction instead of
+#                                     the sky's: eyes and glasses no longer glow white indoors
+#                                     (runs 243-246; after trustno1-coder/VIctory-NVIDIA 2db59d4)
 #   VICTORY_UI_PLANE_720=1            the interface on a plane of its own at 3840x2160 over the
 #                                     scene at 1920x1080 (the fork's pull request 28): at the
 #                                     title's single plane it kept its 4K pixel size, hints and
@@ -77,5 +81,5 @@ exec "$here/play.sh" --start "${options[@]}" "$exe" \
     VICTORY_OUTPUT=1920x1080 \
     VICTORY_PORT_CONSTANTS=1 VICTORY_PORT_DESCRIPTORS=1 VICTORY_PORT_CBV=1 \
     VICTORY_FRAME_INTERVAL_MS=16.667 VICTORY_FRAME_INTERVAL_DRAWS=500 VICTORY_CARD_BUFFERS_MIN_KB=64 \
-    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 VICTORY_UI_PLANE_720=1 VICTORY_WINDOWS_BAR_MB=4096 \
+    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 VICTORY_UI_PLANE_720=1 VICTORY_WINDOWS_BAR_MB=4096 VICTORY_AMBIENT_SPECULAR=1 \
     "${fsr[@]}" "${settings[@]}"
