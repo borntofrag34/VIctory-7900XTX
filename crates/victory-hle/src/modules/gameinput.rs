@@ -1281,10 +1281,87 @@ mod host {
         });
         let (start, keys) = &*SCRIPT;
         let now = start.elapsed();
-        keys.iter()
+        let mut down: Vec<u8> = keys
+            .iter()
             .filter(|&&(from, to, _)| (from..to).contains(&now))
             .map(|&(_, _, vk)| vk)
-            .collect()
+            .collect();
+        down.extend(live_keys());
+        down
+    }
+
+    /// The key of a name as `VICTORY_KEYS` takes it.
+    #[cfg(feature = "diagnostics")]
+    fn key_code(key: &str) -> Option<u8> {
+        Some(match key.trim() {
+            "Enter" => 0x0D,
+            "Esc" => 0x1B,
+            "Tab" => 0x09,
+            "Back" => 0x08,
+            "Up" => 0x26,
+            "Down" => 0x28,
+            "Left" => 0x25,
+            "Right" => 0x27,
+            k if k.len() == 1 && k.as_bytes()[0].is_ascii_alphanumeric() => k.as_bytes()[0].to_ascii_uppercase(),
+            _ => return None,
+        })
+    }
+
+    /// Debugging aid: `VICTORY_KEYS_FILE=<path>`, a file read again whenever
+    /// it changes while the title runs. Each line `<key> <seconds>` (keys as
+    /// `VICTORY_KEYS` names them; several keys on a line with `+`: `W+L 2`)
+    /// holds them that long from the moment the change is read; a line `wait
+    /// <seconds>` waits before the next. So a session outside can steer the
+    /// title step by step, looking at what it shows in between.
+    #[cfg(feature = "diagnostics")]
+    fn live_keys() -> Vec<u8> {
+        use std::sync::Mutex;
+        struct Live {
+            path: Option<std::path::PathBuf>,
+            stamp: Option<std::time::SystemTime>,
+            steps: Vec<(Vec<u8>, Duration)>,
+            began: Instant,
+        }
+        static LIVE: LazyLock<Mutex<Live>> = LazyLock::new(|| {
+            Mutex::new(Live {
+                path: std::env::var_os("VICTORY_KEYS_FILE").map(Into::into),
+                stamp: None,
+                steps: Vec::new(),
+                began: Instant::now(),
+            })
+        });
+        let mut live = LIVE.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(path) = live.path.clone() else {
+            return Vec::new();
+        };
+        let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        if stamp.is_some() && stamp != live.stamp {
+            live.stamp = stamp;
+            let text = std::fs::read_to_string(&path).unwrap_or_default();
+            live.steps = text
+                .lines()
+                .filter_map(|line| {
+                    let (keys, secs) = line.trim().rsplit_once(' ')?;
+                    let secs = Duration::try_from_secs_f64(secs.trim().parse().ok()?).ok()?;
+                    let keys: Vec<u8> = if keys.trim() == "wait" {
+                        Vec::new()
+                    } else {
+                        keys.split('+').map(key_code).collect::<Option<Vec<u8>>>()?
+                    };
+                    Some((keys, secs))
+                })
+                .collect();
+            live.began = Instant::now();
+            tracing::info!(steps = live.steps.len(), "VICTORY_KEYS_FILE read");
+        }
+        let mut at = live.began.elapsed();
+        for (keys, secs) in &live.steps {
+            if at < *secs {
+                return keys.clone();
+            }
+            at -= *secs;
+        }
+        Vec::new()
     }
 
     /// The foreground window is one of ours (the title's or our fallback).

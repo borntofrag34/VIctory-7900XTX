@@ -1070,6 +1070,21 @@ a fifth of the card's budget is free.
 request 28 was merged: their interface is at the old size. Their times stand, as 28 does not
 change them, runs 216-219.)
 
+### Played into the first mission (run 242, 2026-11-28)
+
+The character was steered live: `VICTORY_KEYS_FILE=<path>` (diagnostics builds) names a
+file the input layer reads again whenever it changes, each line `<keys> <seconds>` (keys
+as `VICTORY_KEYS` names them, several with `+`, `wait <seconds>` for none), held from the
+moment the change is read. A session outside wrote a step, looked at the newest kept
+frames (`VICTORY_CAPTURE_WORLD`, every eighth), and wrote the next. From the save in the
+prison cell: the cell, the objective to approach an inmate, then to go with the guard
+(C.O. Wilson) through the dormitory, the common room, a gate and the corridors; the
+parole office; out of prison; the first mission, the hold-up of a cheque-cashing shop,
+up to its aiming tutorial (the stand-in pad's left trigger did not pass that step).
+Frame by stretch: café cutscene 37.3 ms, prison 31.0, corridors 26.9, shop 44.0 (median
+of report lines); no device lost, nothing in the kernel log. Indoors the characters' eyes
+glow white, and in the shop the player and bright surfaces are blown out to white.
+
 These runs started in the prison: the long run (215) had saved the game's progress there
 (a new save slot at its end). Measured runs from here on are in the prison by day, not the
 night cutscene: their frames are not comparable with the ones above.

@@ -1,5 +1,53 @@
 # VIctory on an RX 7900 XTX
 
+## Playability report: Linux, branch `linux-wine` (2026-11-28)
+
+**Played, on Linux under Proton, through Lucia's prison prologue and into the first
+mission, with a controlled character, at about 30 fps at 1920x1080.** One PC, one
+session (run 242, about 12 minutes of game time), started from a save in the prison
+cell. Ray tracing off. No game files are in this repository.
+
+- **PC:** AMD Radeon RX 7900 GRE 16 GB, Ryzen 9 9900X, 46 GB RAM, CachyOS Linux,
+  Mesa 26.3.1 (RADV), Proton Experimental (Wine 11), vkd3d-proton 3.2.0.
+- **How it was run:** `scripts/play-1080p.sh` (Series X profile, the picture made at
+  1920x1080 and run through FSR 4.1.1 `native` as anti-aliasing, the interface on its
+  own plane). The character was steered with the layer's stand-in pad (W/A/S/D left
+  stick, I/J/K/L camera, Z/C triggers, Enter for A), driven live through
+  `VICTORY_KEYS_FILE` (diagnostics builds; `crates/victory-hle/src/modules/gameinput.rs`).
+
+What happened, in order (the game's own objectives and subtitles, in the French
+version played):
+
+1. The prison cell: the move/camera hint shows, the character turns and walks.
+2. Objective "approach a fellow inmate to interact with her": walked to an inmate at a
+   table; the interaction plays.
+3. Objective "go with the prison guard": followed C.O. Wilson out of the dormitory,
+   through the common room and a barred gate, down the corridors.
+4. The parole office cutscene ("Lucia Caminos?", "a supervised release programme").
+5. Out of prison: the cutscene of Lucia loading a pistol, then outside by day in front
+   of the shops.
+6. **First mission: the hold-up of a cheque-cashing shop ("CAJERO")**, the clerk
+   on his knees, the aiming tutorial on screen. Stopped there: the stand-in pad's left
+   trigger did not satisfy the tutorial's aim step in this session.
+
+Frame times over the same session (median of the layer's report lines): the café
+cutscene 37.3 ms (27 fps), the prison 31.0 ms (32 fps), its corridors 26.9 ms (37 fps),
+the shop 44.0 ms (23 fps); in the prison scene measured on its own, 28.2 ms (35 fps,
+runs 237-240). **Stability:** no crash, no device lost, nothing in the kernel log over
+this session, the 420 s run through the intro to the "PROLOGUE" card (run 215) and
+some sixty measured runs since 2026-11-27. One launch on 2026-11-26 hung the GPU
+(amdgpu ring timeout); not seen since, cause not found.
+
+**Rendering, honestly:** faces, hair, skin, clothes, rooms and daylight streets are
+drawn and lit; FSR 4 at the output size keeps faces and fabric sharp. Known faults:
+characters' eyes glow white indoors, and in the shop the player character and bright
+surfaces are blown out to white (specular and light far too strong without ray
+tracing); some rooms are too dark; textures can arrive late after a scene change.
+
+Every figure is from `docs/linux-wine.md` on this branch, with the run behind it.
+
+---
+
 A fork of [VIctory](https://github.com/Marvisak/VIctory), a compatibility layer
 that runs an Xbox Series title natively on Windows from files the user supplies.
 
