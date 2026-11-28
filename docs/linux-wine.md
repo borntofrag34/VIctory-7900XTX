@@ -1165,17 +1165,16 @@ frames compressed on the submitting thread) 47.3 ms. Against the prison (run 270
 |---|---|---|
 | preparing, the submitting thread | 11.0 ms | 20.2 ms |
 | refreshes in the lists' steps | 4.2 ms | 10.3 ms |
-| waiting for flights | 4.0 ms | 11.1 ms |
+| waiting for flights | 4 to 6 ms | 11.1 ms |
 | askings of the write watch, all threads | 344, 4.3 ms | 481 to 499, 24 to 29 ms |
-| waiting for the guards, all threads | 1.5 ms | 24.9 ms |
-| changing protections | 1.3 ms | 6.6 ms |
-| the card's memory held | 13.4 GiB + 3.9 GiB of the PC's | 14.4 GiB + 5.6 GiB |
+| waiting for the guards, all threads | 2.1 ms | 24.9 ms |
+| changing protections | 1.6 ms | 6.6 ms |
 
 The submitting thread is parked 55.8 % of its samples there too and 4.6 % in
-`NtGetWriteWatch`; the card draws 126 W. So what was measured as not worth porting in the
+`NtGetWriteWatch`; the card draws 126 W (159 in the prison). So what was measured as not worth porting in the
 prison (the refreshes' journal walk, run 271; dankxylese/leotux c3089c8, written pages
 asked of Linux's `PAGEMAP_SCAN` without Wine's lock; their guards' later forms) has to be
-measured again here, where the write watch and the guards cost six to sixteen times more.
+measured again here, where the write watch and the guards cost six to twelve times more.
 Not done yet. `tools/gapfels-data.sh` (beside the logs) makes such a data folder.
 
 ## Tools
