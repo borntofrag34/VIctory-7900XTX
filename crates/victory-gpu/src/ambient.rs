@@ -1014,6 +1014,19 @@ mod tests {
         assert_eq!(parse_specular("0.6,x"), Some(Specular { share: 0.6, sky: 0.0 }));
     }
 
+    #[test]
+    #[ignore = "requires a runtime compiler with root signature support"]
+    fn ambient_compilers_keep_embedded_root_signatures() {
+        use victory_shader::dxbc::{Container, FourCC};
+
+        for (part, entry) in [("KEEP", "keep"), ("REFLECT", "reflect_light")] {
+            let source = format!("#define {part}\n{SOURCE}");
+            let dxbc = crate::dxc::compile(&source, entry, "cs_5_1").unwrap_or_else(|error| panic!("{entry}: {error}"));
+            let container = Container::parse(&dxbc).unwrap();
+            assert!(container.part(FourCC::RTS0).is_some(), "{entry} lost its root signature");
+        }
+    }
+
     /// The host compiler produces usable pipelines for all ambient passes.
     #[test]
     fn the_passes_build() {
