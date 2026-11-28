@@ -1049,6 +1049,17 @@ the cell at 25.5 frames a second (39.2 ms), the submitting thread 33.9 ms, no fa
 character did not move: the keys reach the title as keyboard and as the stand-in pad's
 stick, but at that point of the game it did not take them. Free play is not shown yet.
 
+fxceless 1506 and 1507 (AMD's compiler got 64-bit compares wrong where operands share a
+dword, and `v_mad_u64_u32`'s carry where the addend's pair shares a register with a
+factor): 537 of the title's 25,790 shaders translate differently with them
+(`TRANSLATOR_VERSION` 0x4c00_0004). In the prison, by turns: 30.6 and 31.9 ms with, 31.3
+and 31.9 without (runs 230-233); the picture the same at the same moments, brightness 70.1
+against 71.5 (runs 234-235). Taken.
+
+(The executable of runs 222 to 235 marked "linux-wine" or "base" was built before pull
+request 28 was merged: their interface is at the old size. Their times stand, as 28 does not
+change them, runs 216-219.)
+
 These runs started in the prison: the long run (215) had saved the game's progress there
 (a new save slot at its end). Measured runs from here on are in the prison by day, not the
 night cutscene: their frames are not comparable with the ones above.
