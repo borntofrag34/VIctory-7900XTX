@@ -172,6 +172,22 @@ pub(crate) fn on() -> bool {
     (set() != Set::Off || specular().is_some()) && (rt_band().is_some() || !crate::pipeline::builder_runs())
 }
 
+/// `VICTORY_AMBIENT_ONCE=1` (after trustno1-coder/VIctory-NVIDIA 8cf0a75): the
+/// estimate is one bounce of the light the title's own lighting put there,
+/// not of the stand-in's too. The light the visible surfaces send out (the
+/// estimate's source) is that of the frame before, which the stand-in had
+/// raised: its own light comes back to it. With a share `level` of what
+/// surfaces send out and surfaces sending out a share `a` of what they get,
+/// the light settles at `level e / (1 - level a)` instead of one bounce: at
+/// 0.8 and walls of 0.6, 1.9 times; more near pale surfaces and lamps (the
+/// rooms blown out to white). With it the raise notes, at the 25 places of
+/// each cell the next keep reads, the share of the light there that is the
+/// title's own, and the keep counts each place by that share.
+fn once() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("VICTORY_AMBIENT_ONCE").is_some_and(|v| v == "1"))
+}
+
 /// `VICTORY_AMBIENT_SPECULAR=<share>[,<sky>]` (after trustno1-coder/VIctory-NVIDIA
 /// 2db59d4): reflections whose rays found nothing take `share` of the
 /// estimate along the reflected direction instead of the sky's light; `sky`
@@ -316,7 +332,11 @@ cbuffer Set : register(b0) {
 };
 Texture2D<float> depth : register(t0);
 // Cells: the light they send out (then, at CELLS, the slow mean), from
-// CELLS + 1 on where they are.
+// CELLS + 1 on where they are, from SHARES on the share of the title's own
+// light at each of the 25 places of a cell the keep reads (x; y: written).
+#define SHARES (2 * CELLS + 1)
+// `probe`'s bit 1: `once` (VICTORY_AMBIENT_ONCE).
+#define ONCE ((probe & 2u) != 0u)
 RWStructuredBuffer<float4> cells : register(u1);
 // Three a point: red, green and blue, each a mean and a direction.
 RWStructuredBuffer<float4> points : register(u2);
@@ -346,7 +366,10 @@ void keep(uint3 at : SV_DispatchThreadID) {
         float3 c = max(radiance[p], 0.0);
         c = any(isnan(c)) || any(isinf(c)) ? 0.0 : c;
         // Lamps and glints count, but not for everything.
-        sum += c / max(1.0, dot(c, LUMA) / 20.0);
+        c /= max(1.0, dot(c, LUMA) / 20.0);
+        // Not the stand-in's own light, reflected (`once`).
+        float4 share = cells[SHARES + (at.y * CX + at.x) * 25 + y * 5 + x];
+        sum += ONCE && share.y > 0.0 ? c * saturate(share.x) : c;
     }
     cells[at.y * CX + at.x] = float4(sum / 25.0, 1.0);
 }
@@ -576,7 +599,19 @@ void raise(uint3 at : SV_DispatchThreadID) {
     was *= min(1.0, top / max(has, 1e-6));
     float3 written = max(was, found * least);
     light[p] = pack(written);
-    if (probe != 0 && (at.x & 15) == 0 && (at.y & 15) == 0) {
+    if (ONCE) {
+        // At the places the next keep reads, the share of the light that is
+        // the title's own.
+        float2 gc = (float2(p) + 0.5) / size * float2(CX, CY);
+        uint2 cell = min(uint2(gc), uint2(CX - 1, CY - 1));
+        uint2 k = min(uint2((gc - float2(cell)) * 5.0), uint2(4, 4));
+        uint2 q = uint2((float2(cell) + (float2(k) + 0.5) / 5.0) * size / float2(CX, CY));
+        if (q.x == uint(p.x) && q.y == uint(p.y)) {
+            float share = dot(was, LUMA) / max(dot(written, LUMA), 1e-6);
+            cells[SHARES + (cell.y * CX + cell.x) * 25 + k.y * 5 + k.x] = float4(share, 1.0, 0.0, 0.0);
+        }
+    }
+    if ((probe & 1u) != 0u && (at.x & 15) == 0 && (at.y & 15) == 0) {
         uint ignored;
         stats.InterlockedAdd(0, 1, ignored);
         stats.InterlockedAdd(4, uint(min(left, 1000.0) * 256.0), ignored);
@@ -589,7 +624,7 @@ void raise(uint3 at : SV_DispatchThreadID) {
 
 /// Bytes of the cells' buffer and of the points'.
 const CELLS: u64 = 64 * 36;
-const CELL_BYTES: u64 = (2 * CELLS + 1) * 16;
+const CELL_BYTES: u64 = (2 * CELLS + 1 + 25 * CELLS) * 16;
 const POINT_BYTES: u64 = 160 * 90 * 48;
 /// Where the slow mean is among the cells (float4s).
 pub(crate) const CELLS_AT: u32 = CELLS as u32;
@@ -771,7 +806,7 @@ pub(crate) fn note_miss(note: MissNote) {
     tracing::info!(
         "a stand-in for reflections (VICTORY_AMBIENT_SPECULAR={share},{sky}) in the last {:.0} s: \
          {} frames, {} dispatches of CS_RayMiss followed (surfaces: {}), each by an estimate along \
-         the reflected direction put in right after it (before CS_ResolveScreenSpace); {} of water \
+         the reflected direction put in right after it (before CS_ResolveScreenSpace); {} of water or the alpha layer \
          and {} before a frame's light was kept left as the title had them",
         now.duration_since(since).as_secs_f32(),
         s.frames.swap(0, Relaxed),
@@ -834,7 +869,7 @@ pub(crate) fn after(list: &HostList, role: Role, views: &Views) -> bool {
     words[9] = most.to_bits();
     words[15] = least.to_bits();
     words[10] = air().to_bits();
-    words[11] = u32::from(crate::lightprobe::on());
+    words[11] = u32::from(crate::lightprobe::on()) | if once() { 2 } else { 0 };
     words[12] = settle().map_or(0.0, |s| s.jump).to_bits();
     words[13] = settle().map_or(0.0, |s| s.fresh).to_bits();
     words[14] = (frame_ms(role) / 1000.0).to_bits();
@@ -916,6 +951,43 @@ mod tests {
         assert_eq!(role(b"..CS_RayMiss_de6b91a6_Wrapped.."), Some(Role::Miss));
         assert_eq!(role(b"..CS_RayMiss_Volumetrics_3c5d8c00_Wrapped.."), None);
         assert_eq!(role(b"..CS_ScreenProbe_RayMiss_80a88544_Wrapped.."), None);
+    }
+
+    /// The keep and raise as they act on the light, frame after frame, for
+    /// surfaces that send out `a` of the light they get and the title's own
+    /// light `title` on each (`VICTORY_AMBIENT_ONCE`'s model): the light it
+    /// settles at on each surface.
+    fn settle_model(level: f32, a: f32, title: &[f32], once: bool) -> Vec<f32> {
+        let mut light = title.to_vec();
+        let mut share = vec![1.0f32; title.len()];
+        for _ in 0..500 {
+            let sent: f32 = light
+                .iter()
+                .zip(&share)
+                .map(|(l, s)| a * l * if once { *s } else { 1.0 })
+                .sum::<f32>()
+                / title.len() as f32;
+            for (i, t) in title.iter().enumerate() {
+                light[i] = t.max(level * sent);
+                share[i] = t / light[i].max(1e-6);
+            }
+        }
+        light
+    }
+
+    /// Without it the stand-in's own light comes back to it; with it, one
+    /// bounce of the title's light (after VIctory-NVIDIA 8cf0a75).
+    #[test]
+    fn once_is_one_bounce_of_the_titles_light() {
+        for a in [0.6f32, 0.9] {
+            let one_bounce = 0.8 * a * 1.0 / 2.0;
+            let fed = settle_model(0.8, a, &[1.0, 0.0], false)[1];
+            let once = settle_model(0.8, a, &[1.0, 0.0], true)[1];
+            assert!((fed - one_bounce / (1.0 - 0.8 * a / 2.0)).abs() < 1e-4, "a={a}: fed back {fed}");
+            assert!((once - one_bounce).abs() < 1e-4, "a={a}: once {once}");
+            assert!(fed > 1.3 * once);
+        }
+        assert_eq!(settle_model(0.8, 0.6, &[1.0, 1.0], true), vec![1.0, 1.0]);
     }
 
     #[test]
