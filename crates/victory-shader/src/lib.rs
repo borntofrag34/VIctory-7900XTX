@@ -30,9 +30,12 @@ pub mod structure;
 /// raw typed loads; 0x4c00_0004: 64-bit compares and v_mad_u64_u32 carries
 /// worked out dword by dword, fxceless 1506 and 1507; 0x4c00_0005: s_min/s_max
 /// give the compare to SCC, legacy multiply-adds keep +0 (leotux 3b2a744, from
-/// Vice-Tay 3c83a33 and 4f2f58f); upstream's own numbers
+/// Vice-Tay 3c83a33 and 4f2f58f); 0x4c00_0006: gfx10 decoder fixes from
+/// leotux (v_nop and friends no longer take a literal, v_cmpx writes EXEC,
+/// _g16 gradients packed, export target 16, annotateHandle not reused across
+/// blocks); upstream's own numbers
 /// stay below.)
-pub const TRANSLATOR_VERSION: u32 = 0x4c00_0005;
+pub const TRANSLATOR_VERSION: u32 = 0x4c00_0006;
 
 pub use dxbc::{Container, FourCC, Part};
 pub use dxil::{DxilProgram, ShaderKind, XboxExtras};
