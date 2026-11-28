@@ -1147,6 +1147,37 @@ of its stacks. The walk those changes spare is about 2 % of the thread here (~0.
 frame); the 4 ms is mostly the thread waiting for the refreshes done beside it. Not
 ported (1,500-2,000 lines in watch.rs, shadow.rs and host.rs, none applying as they are).
 
+### Free roam in a town, from a shared save (runs 272-273, 2026-11-28)
+
+Started from a save another player shared (Gapfels, trustno1-coder/VIctory-NVIDIA issue
+332: the same title id and container names as ours), put in a copy of the data folder
+(`VICTORY_DATA_DIR`); our own save was not touched. This is not story played here: it
+shows what the layer does past the point our own save has reached. Jason by his pick-up
+in a car park, in a town by day: walked round, got into the pick-up, backed out; left
+alone, the title's idle camera took over. Run 272, 30 minutes: no device lost, nothing in
+the kernel log.
+
+Frames there are slower than in the prison: 37 to 48 ms walking or driving (21 to 27 a
+second), 33 ms under the idle camera; run 273 (a scripted walk, sampled every 5 ms, kept
+frames compressed on the submitting thread) 47.3 ms. Against the prison (run 270):
+
+| per frame | prison | town |
+|---|---|---|
+| preparing, the submitting thread | 11.0 ms | 20.2 ms |
+| refreshes in the lists' steps | 4.2 ms | 10.3 ms |
+| waiting for flights | 4.0 ms | 11.1 ms |
+| askings of the write watch, all threads | 344, 4.3 ms | 481 to 499, 24 to 29 ms |
+| waiting for the guards, all threads | 1.5 ms | 24.9 ms |
+| changing protections | 1.3 ms | 6.6 ms |
+| the card's memory held | 13.4 GiB + 3.9 GiB of the PC's | 14.4 GiB + 5.6 GiB |
+
+The submitting thread is parked 55.8 % of its samples there too and 4.6 % in
+`NtGetWriteWatch`; the card draws 126 W. So what was measured as not worth porting in the
+prison (the refreshes' journal walk, run 271; dankxylese/leotux c3089c8, written pages
+asked of Linux's `PAGEMAP_SCAN` without Wine's lock; their guards' later forms) has to be
+measured again here, where the write watch and the guards cost six to sixteen times more.
+Not done yet. `tools/gapfels-data.sh` (beside the logs) makes such a data folder.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
