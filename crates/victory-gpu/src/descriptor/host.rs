@@ -5456,12 +5456,7 @@ void BY_FLOATS_OR_NOT(uint3 id : SV_DispatchThreadID) {
                     .replace("BY_FLOATS_OR_NOT", "main")
                     .replace("#ifdef BY_FLOATS", "#if 0")
             };
-            let code = crate::host::compile(
-                &source,
-                windows::core::s!("main"),
-                windows::core::s!("cs_5_1"),
-            )
-            .expect("the test's shader");
+            let code = crate::dxc::compile(&source, "main", "cs_5_1").expect("the test's shader");
             let (from, filled) = host.shared_buffer(BYTES).expect("a buffer");
             let (to, result) = host.shared_buffer(BYTES).expect("a buffer");
             // SAFETY: the shader's own root signature and plain creation
