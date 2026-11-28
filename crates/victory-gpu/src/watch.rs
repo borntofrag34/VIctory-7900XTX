@@ -2110,6 +2110,14 @@ fn placeholder(block: usize) -> bool {
         return true;
     }
     let mut region = Region::default();
+    // Wine has no answer for the class (STATUS_INVALID_INFO_CLASS, and a
+    // server round trip and a `fixme` line each time): asked once, the
+    // answer is "no" from then on (after Hasusmogus, cool_fox #118).
+    static UNANSWERED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    const STATUS_INVALID_INFO_CLASS: i32 = 0xC000_0003_u32 as i32;
+    if UNANSWERED.load(std::sync::atomic::Ordering::Relaxed) {
+        return false;
+    }
     // SAFETY: the answer's room and its size.
     let status = unsafe {
         NtQueryVirtualMemory(
@@ -2121,6 +2129,9 @@ fn placeholder(block: usize) -> bool {
             std::ptr::null_mut(),
         )
     };
+    if status == STATUS_INVALID_INFO_CLASS {
+        UNANSWERED.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
     status >= 0 && region.region_type & PLACEHOLDER_RESERVATION != 0
 }
 
