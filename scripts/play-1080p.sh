@@ -23,6 +23,10 @@
 #   VICTORY_CARD_TOUCHED=1            a submission asks only the copies in the card's memory
 #                                     that changed, not all 3,450 of them: 1.3 ms less of the
 #                                     submitting thread's work a frame (run 124)
+#   VICTORY_WINDOWS_BAR_MB=4096       windows outside buffers in the card's memory, written by the
+#                                     CPU through the bus (no copy to send, no list of changes):
+#                                     28.2 ms a frame against 31.6, the submitting thread 16.9
+#                                     against 21.5 (runs 237-240, the prison; after zocram4cc)
 #   VICTORY_UI_PLANE_720=1            the interface on a plane of its own at 3840x2160 over the
 #                                     scene at 1920x1080 (the fork's pull request 28): at the
 #                                     title's single plane it kept its 4K pixel size, hints and
@@ -73,5 +77,5 @@ exec "$here/play.sh" --start "${options[@]}" "$exe" \
     VICTORY_OUTPUT=1920x1080 \
     VICTORY_PORT_CONSTANTS=1 VICTORY_PORT_DESCRIPTORS=1 VICTORY_PORT_CBV=1 \
     VICTORY_FRAME_INTERVAL_MS=16.667 VICTORY_FRAME_INTERVAL_DRAWS=500 VICTORY_CARD_BUFFERS_MIN_KB=64 \
-    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 VICTORY_UI_PLANE_720=1 \
+    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 VICTORY_UI_PLANE_720=1 VICTORY_WINDOWS_BAR_MB=4096 \
     "${fsr[@]}" "${settings[@]}"

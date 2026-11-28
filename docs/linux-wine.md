@@ -1056,6 +1056,16 @@ factor): 537 of the title's 25,790 shaders translate differently with them
 and 31.9 without (runs 230-233); the picture the same at the same moments, brightness 70.1
 against 71.5 (runs 234-235). Taken.
 
+`VICTORY_WINDOWS_BAR_MB=4096` (from zocram4cc/victory-linux-perf, where it gave 45.9 against
+48.3 ms on an RX 6900 XT): the title-memory windows outside buffers lie in the card's memory
+and the CPU writes them through the bus, with no copy to send and no list of changes. In the
+prison, by turns: **28.3 and 28.1 ms a frame with it, 31.7 and 31.4 without** (35.4 frames a
+second against 31.7), the submitting thread 17.3 and 16.4 ms against 21.1 and 21.8, the worst
+report line 31.6 and 33.4 against 33.7 and 37.3 (runs 237-240); the picture the same,
+brightness 71.5 (run 241). The card draws 157 W against 150. `scripts/play-1080p.sh` sets it.
+On a card with less memory than this one's 16 GB it may not fit: windows go there only while
+a fifth of the card's budget is free.
+
 (The executable of runs 222 to 235 marked "linux-wine" or "base" was built before pull
 request 28 was merged: their interface is at the old size. Their times stand, as 28 does not
 change them, runs 216-219.)
