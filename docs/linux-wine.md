@@ -1039,6 +1039,16 @@ The frame is the same: 31.6 and 31.8 ms with, 31.6 and 31.4 without. The prompt 
 déplacer / Bouger la caméra" in the prison is at a 1080p interface's size with it, twice that
 without (`sheets/integ/ui-sbs.png` beside the logs). `scripts/play-1080p.sh` sets it.
 
+`VICTORY_STORE_BESIDE=1` and `VICTORY_COPY_BESIDE=1` (zocram4cc/victory-linux-perf measured
+-3.2 ms a frame with both on an RX 7900 XTX): nothing here. In the prison, by turns, two runs
+each: both 31.8 and 31.6 ms, none 31.5 and 31.8, the store alone 31.7 and 31.8 (runs
+223-228). Left off.
+
+A run of 420 s from that save (run 222, scripted keys: W held for 5 s at a time, Enter):
+the cell at 25.5 frames a second (39.2 ms), the submitting thread 33.9 ms, no fault. The
+character did not move: the keys reach the title as keyboard and as the stand-in pad's
+stick, but at that point of the game it did not take them. Free play is not shown yet.
+
 These runs started in the prison: the long run (215) had saved the game's progress there
 (a new save slot at its end). Measured runs from here on are in the prison by day, not the
 night cutscene: their frames are not comparable with the ones above.
