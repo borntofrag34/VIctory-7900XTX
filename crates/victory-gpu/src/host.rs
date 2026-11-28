@@ -3474,7 +3474,8 @@ pub(crate) fn settle_now(why: usize) {
 /// game here, so the switch is there to tell what it changes.
 fn lands_before_remap() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("VICTORY_LAND_BEFORE_REMAP").is_none_or(|v| v != "0"))
+    let on = *ON.get_or_init(|| std::env::var_os("VICTORY_LAND_BEFORE_REMAP").is_none_or(|v| v != "0"));
+    crate::ab::pick("VICTORY_LAND_BEFORE_REMAP").unwrap_or(on)
 }
 
 /// Title memory `[address, address + len)` is about to show other physical

@@ -1089,6 +1089,15 @@ These runs started in the prison: the long run (215) had saved the game's progre
 (a new save slot at its end). Measured runs from here on are in the prison by day, not the
 night cutscene: their frames are not comparable with the ones above.
 
+### Land before remap in the open world (run 262, 2026-11-28)
+
+VIctory-NVIDIA 631 (a mapping lands its pending writes before it is moved) is on by
+default here; a later fork measured its p90 frame going from 78 to 195 ms with it in the
+open world. `VICTORY_LAND_BEFORE_REMAP` can now be flipped inside a run (`VICTORY_AB`).
+Run 262 (420 s from the save at Jason's boat mission, switched every 10 s, 14 phases a
+side): on, median of medians 28.4 ms, p90 39.5; off, 29.9 ms, p90 45.3. No device lost.
+It stays on.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
