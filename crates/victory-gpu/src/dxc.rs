@@ -1,8 +1,9 @@
 //! Compiling our own HLSL at run time.
 //!
 //! A few of the host's passes are written in HLSL and compiled when the host
-//! needs them, including the indirect-argument clamp ([`crate::indirect`])
-//! and the compare of copies in the card's memory ([`crate::host`]).
+//! needs them, including the indirect-argument clamp ([`crate::indirect`]),
+//! the card compare and depth-plane twins ([`crate::host`]), the indirect-light
+//! stand-in ([`crate::ambient`]), and the in-place probe ([`crate::inplace`]).
 //! The system's compiler (`D3DCompile`, `d3dcompiler_47`) is tried first. Under
 //! Wine and Proton that is vkd3d-shader, which refuses some of this source
 //! outright (`E5005: Method 'Load' is not defined on type
