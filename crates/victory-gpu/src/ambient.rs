@@ -49,7 +49,6 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use std::sync::{Mutex, OnceLock};
 
 use windows::Win32::Graphics::Direct3D12::*;
-use windows::core::s;
 
 use crate::host::{HostList, host};
 
@@ -663,8 +662,8 @@ unsafe impl Sync for Pass {}
 
 fn make(device: &ID3D12Device, buffer: impl Fn(u64) -> Option<ID3D12Resource>) -> windows::core::Result<Pass> {
     let mut root: Option<ID3D12RootSignature> = None;
-    let mut pipeline = |part: &str, entry| -> windows::core::Result<ID3D12PipelineState> {
-        let code = crate::host::compile(&format!("#define {part}\n{SOURCE}"), entry, s!("cs_5_1"))?;
+    let mut pipeline = |part: &str, entry: &str| -> windows::core::Result<ID3D12PipelineState> {
+        let code = crate::dxc::compile(&format!("#define {part}\n{SOURCE}"), entry, "cs_5_1")?;
         // SAFETY: the root signature is inside the shader; plain creations.
         unsafe {
             if root.is_none() {
@@ -678,13 +677,13 @@ fn make(device: &ID3D12Device, buffer: impl Fn(u64) -> Option<ID3D12Resource>) -
             device.CreateComputePipelineState(&desc)
         }
     };
-    let keep = pipeline("KEEP", s!("keep"))?;
-    let mean = pipeline("KEEP", s!("mean"))?;
-    let place = pipeline("PLACE", s!("place"))?;
-    let gather = pipeline("GATHER", s!("gather"))?;
-    let raise = pipeline("RAISE", s!("raise"))?;
-    let air = pipeline("AIR", s!("clear_air"))?;
-    let reflect = pipeline("REFLECT", s!("reflect_light"))?;
+    let keep = pipeline("KEEP", "keep")?;
+    let mean = pipeline("KEEP", "mean")?;
+    let place = pipeline("PLACE", "place")?;
+    let gather = pipeline("GATHER", "gather")?;
+    let raise = pipeline("RAISE", "raise")?;
+    let air = pipeline("AIR", "clear_air")?;
+    let reflect = pipeline("REFLECT", "reflect_light")?;
     let made = |bytes| buffer(bytes).ok_or_else(windows::core::Error::empty);
     Ok(Pass {
         root: root.ok_or_else(windows::core::Error::empty)?,
@@ -1015,7 +1014,20 @@ mod tests {
         assert_eq!(parse_specular("0.6,x"), Some(Specular { share: 0.6, sky: 0.0 }));
     }
 
-    /// The passes compile with the system's compiler and the host takes them.
+    #[test]
+    #[ignore = "requires a runtime compiler with root signature support"]
+    fn ambient_compilers_keep_embedded_root_signatures() {
+        use victory_shader::dxbc::{Container, FourCC};
+
+        for (part, entry) in [("KEEP", "keep"), ("REFLECT", "reflect_light")] {
+            let source = format!("#define {part}\n{SOURCE}");
+            let dxbc = crate::dxc::compile(&source, entry, "cs_5_1").unwrap_or_else(|error| panic!("{entry}: {error}"));
+            let container = Container::parse(&dxbc).unwrap();
+            assert!(container.part(FourCC::RTS0).is_some(), "{entry} lost its root signature");
+        }
+    }
+
+    /// The host compiler produces usable pipelines for all ambient passes.
     #[test]
     fn the_passes_build() {
         let Some(host) = host() else {

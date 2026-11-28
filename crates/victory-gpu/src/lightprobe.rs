@@ -28,7 +28,6 @@ use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::sync::{Mutex, OnceLock};
 
 use windows::Win32::Graphics::Direct3D12::*;
-use windows::core::s;
 
 use crate::host::{HostList, host};
 
@@ -150,9 +149,9 @@ fn pipeline(
     device: &ID3D12Device,
     part: &str,
     rs: &str,
-    entry: windows::core::PCSTR,
+    entry: &str,
 ) -> windows::core::Result<(ID3D12RootSignature, ID3D12PipelineState)> {
-    let code = crate::host::compile(&format!("#define {part}\n#define RS \"{rs}\"\n{SOURCE}"), entry, s!("cs_5_1"))?;
+    let code = crate::dxc::compile(&format!("#define {part}\n#define RS \"{rs}\"\n{SOURCE}"), entry, "cs_5_1")?;
     // SAFETY: the root signature is inside the shader; plain creations.
     unsafe {
         let root: ID3D12RootSignature = device.CreateRootSignature(0, &code)?;
@@ -171,8 +170,8 @@ fn pass() -> Option<&'static Pass> {
     PASS.get_or_init(|| {
         let host = host()?;
         let made = || -> windows::core::Result<Pass> {
-            let exposure = pipeline(&host.device, "EXPOSURE", RS_EXPOSURE, s!("exposure"))?;
-            let lux = pipeline(&host.device, "LUX", RS_LUX, s!("lux"))?;
+            let exposure = pipeline(&host.device, "EXPOSURE", RS_EXPOSURE, "exposure")?;
+            let lux = pipeline(&host.device, "LUX", RS_LUX, "lux")?;
             let (ring, data) = host.shared_buffer(RECORD * RING * 4).ok_or_else(windows::core::Error::empty)?;
             // SAFETY: the mapping holds the whole buffer.
             unsafe { std::ptr::write_bytes(data, 0, (RECORD * RING * 4) as usize) };
@@ -305,7 +304,7 @@ mod tests {
         let Some(host) = host() else {
             return;
         };
-        pipeline(&host.device, "EXPOSURE", RS_EXPOSURE, s!("exposure")).expect("exposure pass");
-        pipeline(&host.device, "LUX", RS_LUX, s!("lux")).expect("lux pass");
+        pipeline(&host.device, "EXPOSURE", RS_EXPOSURE, "exposure").expect("exposure pass");
+        pipeline(&host.device, "LUX", RS_LUX, "lux").expect("lux pass");
     }
 }
