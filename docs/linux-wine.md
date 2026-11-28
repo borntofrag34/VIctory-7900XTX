@@ -959,6 +959,76 @@ lock for a third of a millisecond at a time, 2,000 times a second.
     for the title's upscaler). Not provided to FSR: the exposure, reactive and transparency
     masks (others reported noise on particles from that; not looked at here).
 
+    What the title hands FSR (a test build logging each dispatch, run 148): the reactive and
+    transparency slots are empty and exposure is automatic (creation flags 0x29) on the
+    title's side, not dropped by the bridge; the jitter moves from frame to frame in a short
+    cycle, as FSR wants it.
+
+## Others' fixes measured here (2026-11-27 and 28)
+
+Each candidate was tried on top of what had been kept before it, in turn with what it was
+tried against: two runs each side of 200 s read from second 100, `play-1080p.sh`'s settings,
+no frames kept, then one run with every eighth frame of the world kept to look at the
+picture (`side-by-side.sh` at the same moments, `brightness.py`). Runs of the same thing lie
+1 to 2 ms apart, so a difference under that is read as none. The first scene is a cutscene:
+none of these changed what it shows.
+
+Kept (this branch has them, one commit each, with their source in the message):
+
+| Fix | Source | Runs | Frame with / without |
+|---|---|---|---|
+| The fork's pull requests 21 to 27 | UwUCammie | 152-157, 175-179 | 33.7/32.8 against 32.3/32.1 ms (21 to 25 with NVIDIA 223, 225) |
+| Split submissions keep their dynamic descriptors; formats 189-191; no BC MSAA layout | trustno1-coder/VIctory-NVIDIA 223, 225, 386 | as above | |
+| Clean write-watch shards and heap-pass self-requeues skipped | anoyarou b109dc2 (from maren-halv/VIctory-Fast) | 160-163 | the submitting thread 25.6/26.5 against 26.9/27.6 ms |
+| Texture pool pieces used again once the card is done with them | after Hasusmogus/cool_fox f97fdade | 169-174 | frame the same; textures that waited for memory shown 8.2/8.5 s late against 9.4/8.5 |
+| memcpy and memmove of our own under Wine | anoyarou 33ca7a1 | 185-188 | 31.7/34.1 against 32.9/34.8 ms |
+| x86-64-v3 build | VIctory-NVIDIA 603 (part a) | 200-203 | 32.3/32.2 against 33.5/31.7 ms |
+| Land before remap; cache key race; zero only holes; timestamp slots; RVAs past 4 GiB | VIctory-NVIDIA 631, 632, 2cffd2d, 202d285; Raptorbk45 a82b0d4 | 205-212 | the same |
+| Card-step constant buffers learnt and checked, **off** (`VICTORY_CARD_STEPS_LEARN=1`) | Raptorbk45 4f7d65c (from SlaktarnVI) | 205-211 | on: 40.7 against 33.2 ms |
+
+The copy of our own is the one that matters: `victory.exe` imports `memcpy` and `memmove`
+from `VCRUNTIME140`, which Proton's `vcruntime140.dll` forwards to `ntdll`, and `ntdll`'s
+copy goes a byte at a time: `RtlMoveMemory` 195-205 us a MiB, `ucrtbase`'s `memmove` 6.4,
+and `HeapReAlloc` moving a block of 1 MiB 285 us (a small benchmark under Proton
+Experimental). Bypassing only `HeapReAlloc` gained nothing (runs 180-183).
+
+Tried and left out: Vice-Tay 357, heap pacing against stretched triangles (39.5/41.3 ms
+against 32.5/32.3, runs 148-151; no stretched triangles seen without it in the first scene);
+cool_fox d78b9eb5, `memcmp` of our own (33.9/35.4 against 32.3/32.5, runs 165-168);
+VIctory-NVIDIA 552, non-temporal snapshot copies (the same, runs 190-193); Vice-Tay 370's
+sRGB and linear view casts (never asked for in the first scene: no line in the log, the
+picture the same, runs 158-159); VIctory-NVIDIA 353, feb90ad and 0745a5d, translator fixes
+(`victory shaders` translated all 25,790 again and none came out different).
+
+Not needed here: Vice-Tay 372 and VIctory-NVIDIA 243 (the head blend-shape pass: its
+pipeline is made at loading and first bound at frame 998, never dropped: `VICTORY_COMPUTE_WAIT_MS`
+covers it); VIctory-NVIDIA 340 (its sweep runs at relay stage 3, `play.sh` sets 2); FiveNine
+f9d2da84 (0 questions about holes a frame here, `VICTORY_WINE_MAP`); VIctory-NVIDIA 662 (the
+largest group count asked for is 216).
+
+Device methods 0x1c8 and 0x218 ("a pipeline creation method that is not implemented", some
+16,000 calls a run) take nothing from the picture: refused, the title makes the same
+pipeline from a container through 0x1f0, which translates far better. VIctory-NVIDIA 506,
+which reads 0x218's loose parts, found 29 % of draws dropped with it against 3 % without and
+left it off. Not taken.
+
+Skipping cool_fox 113's 43 passes that only prepare for ray tracing
+(`VICTORY_SKIP_PIPELINES`, the list in `~/Games/victory-logs/patches/`): 31.3/32.4 against
+32.7/32.6 ms, the first scene's picture the same (runs 195-199). Not in the launcher yet:
+interiors not looked at.
+
+The "dropped without a host pipeline" count (130 to 350 a frame) is the ray-tracing
+structure builder's stages, which are off with ray tracing.
+
+### Past the first scene (run 215)
+
+A run of 420 s on this branch with Enter pressed every 6 s from second 120: the night
+cutscene, an interior, the prison by day and the "PROLOGUE" title card, with no device lost
+(the fork's pull request 27 is for that, at the change of scene after the intro) and no
+fault in the kernel's log. The frame over seconds 300 to 420: 36.1 ms (27.7 frames a
+second), from 23.5 to 60.6 ms by scene, the longest while the prison loaded (829 draws a
+frame dropped while their pipelines were made, then back to the builder's).
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
