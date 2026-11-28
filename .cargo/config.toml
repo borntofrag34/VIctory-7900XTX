@@ -1,2 +1,8 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# The title runs only on a processor with AVX2 (it is built for the console's
+# Zen 2), so our own code may use x86-64-v3 (AVX2, BMI1/2, FMA, F16C, LZCNT,
+# MOVBE); without it the compiler kept to SSE2. (VIctory-NVIDIA #603, part a.)
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
