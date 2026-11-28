@@ -27,8 +27,10 @@ pub mod structure;
 /// translates again what an earlier build of the translator cached and says
 /// how many came out different: if any did, the bump was due.
 /// (0x4c00_0001 and up: the Linux tree's, with #927's half views and the
-/// raw typed loads; upstream's own numbers stay below.)
-pub const TRANSLATOR_VERSION: u32 = 0x4c00_0003;
+/// raw typed loads; 0x4c00_0004: 64-bit compares and v_mad_u64_u32 carries
+/// worked out dword by dword, fxceless 1506 and 1507; upstream's own numbers
+/// stay below.)
+pub const TRANSLATOR_VERSION: u32 = 0x4c00_0004;
 
 pub use dxbc::{Container, FourCC, Part};
 pub use dxil::{DxilProgram, ShaderKind, XboxExtras};
