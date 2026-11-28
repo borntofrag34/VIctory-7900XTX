@@ -1098,6 +1098,18 @@ Run 262 (420 s from the save at Jason's boat mission, switched every 10 s, 14 ph
 side): on, median of medians 28.4 ms, p90 39.5; off, 29.9 ms, p90 45.3. No device lost.
 It stays on.
 
+### The air bound and the smoke flares (run 265, 2026-11-28)
+
+In Jason's first mission the packages are marked by smoke flares; near one, the smoke
+comes out as blocks of saturated pink or red over much of the picture, in grains, not as
+soft smoke. `VICTORY_AMBIENT_AIR` (the air's light bounded by the light around; 1.5 in
+VIctory-NVIDIA's launcher) can now be flipped inside a run (`VICTORY_AB`), and a NaN or
+infinite froxel is zeroed in that pass (DoubleGhosty/cool_fox fae8484 by Dathinel). Run
+265, 15 s a side, standing still by a red flare: the blocks are the same with it on and
+off, so they are not the volumetric air; on, 37.1 ms a frame (median of 17 phases)
+against 33.3 off. It stays off. Not yet known: what makes the flare's particles that
+bright.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):

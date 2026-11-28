@@ -223,12 +223,20 @@ fn bounds() -> (f32, f32) {
 
 /// The most the air scatters, as a multiple of the light around
 /// (`VICTORY_AMBIENT_AIR=<multiple>`; unset or 0: what the title has).
+/// Under `VICTORY_AB` naming `VICTORY_AMBIENT_AIR`, off in the phases that
+/// have it off (1.5, VIctory-NVIDIA's launcher's, when no multiple is set).
 fn air() -> f32 {
     static SET: OnceLock<f32> = OnceLock::new();
-    *SET.get_or_init(|| {
+    let set = *SET.get_or_init(|| {
         let set = std::env::var("VICTORY_AMBIENT_AIR").unwrap_or_default();
         set.trim().parse().ok().filter(|v: &f32| v.is_finite() && *v > 0.0).unwrap_or(0.0)
-    })
+    });
+    match crate::ab::pick("VICTORY_AMBIENT_AIR") {
+        Some(true) if set == 0.0 => 1.5,
+        Some(true) => set,
+        Some(false) => 0.0,
+        None => set,
+    }
 }
 
 /// How the slow mean of the light around follows the frames
@@ -451,6 +459,10 @@ void clear_air(uint3 at : SV_DispatchThreadID) {
     float far = float(at.z) / float(d);
     float cap = air * lerp(dot(cells[CELLS].rgb, LUMA), dot(seen_there, LUMA), far);
     float3 c = scattered[at];
+    // A NaN or an infinity in the air is summed along every view ray
+    // through it: white or black patches floating there (DoubleGhosty/cool_fox
+    // fae8484 by Dathinel, after trustno1-coder/VIctory-NVIDIA 77e13a97).
+    if (any(isnan(c)) || any(isinf(c))) { scattered[at] = float3(0.0, 0.0, 0.0); return; }
     float has = dot(c, LUMA);
     if (has > cap) scattered[at] = c * (cap / has);
 }
