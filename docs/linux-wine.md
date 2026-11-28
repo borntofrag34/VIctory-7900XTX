@@ -906,6 +906,17 @@ lock for a third of a millisecond at a time, 2,000 times a second.
     (run 95, 44.3), the submitting thread working 22.4 and 17.6 ms of them. The frames of the
     world kept of the run with it are whole pictures, faces too. `scripts/play-1080p.sh` sets
     it. The first scene alone.
+
+    A separate RX 7900 XT test on Wine 11.22, RADV 26.3.1 and vkd3d-proton
+    `71cae091b06571e` used the merged `4f317404` release, Series X at native
+    1280×720 and warm graphics caches. It alternated the settings, with the
+    enabled runs in the middle. From 60 to 150 seconds after the first present,
+    the two runs without it accepted 16.61 and 17.13 presents/s. With it they
+    accepted 18.39 and 18.94 presents/s. Time in frame gaps above 100 ms fell
+    from 3.3–3.5 s to 2.0–2.4 s. A separate visual pass at 1080p showed facial
+    skin and complete scenery in the sampled opening frames. These timings
+    cover the warm opening on this setup. The cold first-boot result remains open.
+
 13. Where the submitting thread's time goes, and `VICTORY_CARD_TOUCHED=1`. The card is not
     what holds the frame back any more: its core runs at 2,460 MHz and it draws 127 to 133 W
     of the 220 it may (runs 119 to 128), while the submitting thread works most of the
