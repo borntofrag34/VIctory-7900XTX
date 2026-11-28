@@ -1177,6 +1177,19 @@ asked of Linux's `PAGEMAP_SCAN` without Wine's lock; their guards' later forms) 
 measured again here, where the write watch and the guards cost six to twelve times more.
 Not done yet. `tools/gapfels-data.sh` (beside the logs) makes such a data folder.
 
+### Killed lanes go on with their quad (anoyarou d8d7473, runs 267 and 274)
+
+A candidate for the smoke flares' blocks: a pixel program's killed lanes left at once, so
+quad sums read lanes that were gone (NaN or about 65,504 into the scene's colour;
+anoyarou/VIctory-RDNA4-linux d8d7473 by Serph91P). Taken as it is, 13 of the title's
+programs stopped translating (195 refused became 208: glass, mirror and red-dot pixel
+programs at "a constant lane mask", though the change adds no refusal of its own); they
+are translated a second time without the rule (`structure::without_quad_helpers`), and
+195 are refused as before. 4,857 of 25,790 programs change: `TRANSLATOR_VERSION`
+0x4c00_0007. Run 267 (30 minutes, Jason's boat mission) and run 274 (free roam in town,
+46.5 ms a frame as before it): no fault, glass and people drawn as before. Whether the
+flares' blocks are gone is not known: no flare came into view in either run.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
