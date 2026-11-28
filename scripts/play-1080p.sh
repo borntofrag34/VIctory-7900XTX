@@ -23,6 +23,10 @@
 #   VICTORY_CARD_TOUCHED=1            a submission asks only the copies in the card's memory
 #                                     that changed, not all 3,450 of them: 1.3 ms less of the
 #                                     submitting thread's work a frame (run 124)
+#   VICTORY_UI_PLANE_720=1            the interface on a plane of its own at 3840x2160 over the
+#                                     scene at 1920x1080 (the fork's pull request 28): at the
+#                                     title's single plane it kept its 4K pixel size, hints and
+#                                     subtitles twice too large. Frame the same (runs 216-219).
 #   FSR 4 `native`                    when AMD's signed amd_fidelityfx_upscaler_dx12.dll is found
 #                                     (FIDELITYFX_DIR, default: Forza Horizon 6's Steam folder):
 #                                     the title's picture made at 1920x1080 and run through PC FSR
@@ -69,4 +73,5 @@ exec "$here/play.sh" --start "${options[@]}" "$exe" \
     VICTORY_OUTPUT=1920x1080 \
     VICTORY_PORT_CONSTANTS=1 VICTORY_PORT_DESCRIPTORS=1 VICTORY_PORT_CBV=1 \
     VICTORY_FRAME_INTERVAL_MS=16.667 VICTORY_FRAME_INTERVAL_DRAWS=500 VICTORY_CARD_BUFFERS_MIN_KB=64 \
-    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 "${fsr[@]}" "${settings[@]}"
+    VICTORY_JOIN_PARTS_DRAWS=500 VICTORY_WC_NO_BACK=1 VICTORY_CARD_TOUCHED=1 VICTORY_UI_PLANE_720=1 \
+    "${fsr[@]}" "${settings[@]}"

@@ -1029,6 +1029,20 @@ fault in the kernel's log. The frame over seconds 300 to 420: 36.1 ms (27.7 fram
 second), from 23.5 to 60.6 ms by scene, the longest while the prison loaded (829 draws a
 frame dropped while their pipelines were made, then back to the builder's).
 
+### The interface at its own size (the fork's pull request 28, runs 216-221)
+
+With `VICTORY_OUTPUT=1920x1080` the title drew its interface at its 4K pixel size: hints,
+prompts and subtitles twice too large. `VICTORY_UI_PLANE_720=1` (UwUCammie) has the title
+draw the scene at 1920x1080 and the interface on a second plane at 3840x2160, which the
+layer composes (the log: "1920x1080 scene, 3840x2160 interface", "compositing two planes").
+The frame is the same: 31.6 and 31.8 ms with, 31.6 and 31.4 without. The prompt "Se
+déplacer / Bouger la caméra" in the prison is at a 1080p interface's size with it, twice that
+without (`sheets/integ/ui-sbs.png` beside the logs). `scripts/play-1080p.sh` sets it.
+
+These runs started in the prison: the long run (215) had saved the game's progress there
+(a new save slot at its end). Measured runs from here on are in the prison by day, not the
+night cutscene: their frames are not comparable with the ones above.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
