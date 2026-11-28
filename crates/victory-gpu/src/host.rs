@@ -3475,7 +3475,11 @@ pub(crate) fn settle_now(why: usize) {
 fn lands_before_remap() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
     let on = *ON.get_or_init(|| std::env::var_os("VICTORY_LAND_BEFORE_REMAP").is_none_or(|v| v != "0"));
-    crate::ab::pick("VICTORY_LAND_BEFORE_REMAP").unwrap_or(on)
+    #[cfg(feature = "diagnostics")]
+    if let Some(on) = crate::ab::pick("VICTORY_LAND_BEFORE_REMAP") {
+        return on;
+    }
+    on
 }
 
 /// Title memory `[address, address + len)` is about to show other physical

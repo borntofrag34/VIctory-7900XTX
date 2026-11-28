@@ -1110,6 +1110,19 @@ off, so they are not the volumetric air; on, 37.1 ms a frame (median of 17 phase
 against 33.3 off. It stays off. Not yet known: what makes the flare's particles that
 bright.
 
+### Title memory kept under 128 GiB (VIctory-NVIDIA 1041, run 268)
+
+Shaders reach title memory by address through a directory of 2^21 pages of 64 KiB
+(128 GiB); the XMem range allowed up to 40 bits, so a pool the host placed higher would
+read as 0 (vehicle panels and faces gone; trustno1-coder/VIctory-NVIDIA 1041 by Mumogg, under
+GE-Proton: 9 of 9 bad starts had pools above it). 64-bit requests now stay under 2^37. In
+our runs 262-267 the title's memory never went past 72 GiB, so this guards a start that
+may come rather than one seen. Run 268 (420 s): 29.5 ms a frame, memory up to 65 GiB, no
+page without a copy, `xmem` tests 22 of 22 under Wine.
+
+The in-run switches of 0e193cb2 and 3ff9fde7 broke a build without `diagnostics`
+(`crate::ab` is only there with it); they are behind it now, like the others.
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):

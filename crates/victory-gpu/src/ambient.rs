@@ -231,12 +231,14 @@ fn air() -> f32 {
         let set = std::env::var("VICTORY_AMBIENT_AIR").unwrap_or_default();
         set.trim().parse().ok().filter(|v: &f32| v.is_finite() && *v > 0.0).unwrap_or(0.0)
     });
+    #[cfg(feature = "diagnostics")]
     match crate::ab::pick("VICTORY_AMBIENT_AIR") {
-        Some(true) if set == 0.0 => 1.5,
-        Some(true) => set,
-        Some(false) => 0.0,
-        None => set,
+        Some(true) if set == 0.0 => return 1.5,
+        Some(true) => return set,
+        Some(false) => return 0.0,
+        None => {}
     }
+    set
 }
 
 /// How the slow mean of the light around follows the frames
