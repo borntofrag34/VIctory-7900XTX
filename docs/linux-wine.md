@@ -247,6 +247,14 @@ brightness was taken (0 to 255).
   in run 30, 22.8 in run 32) and halves their waits for the guards (11.0 to 5.5 ms).
 - `VICTORY_OUTPUT=1920x1080`: 39.2 ms a frame (25.5 fps), the card 78 % busy, the picture
   there (run 27). The largest gain left that was measured.
+- `VICTORY_UI_PLANE_720=1` with `VICTORY_OUTPUT=1920x1080` or `1280x720`: the interface gets
+  the title's second plane, laid out at 3840x2160 and brought down onto the scene by the
+  compositor (`VICTORY_PLANES`, on by default). Without it the interface is drawn into the
+  scene with its elements as many pixels large as at 3840x2160: twice too large at
+  1920x1080 (a tip's panel runs off the bottom of the picture), three times at 1280x720.
+  On an RX 7900 XT (RADV 26.3.1, Wine 11.22) over the opening, same keys, warm: 15.8 frames
+  a second at 1920x1080 against 16.3 at 1280x720, both with the switch, which is inside
+  what two runs of one setting differ by there. Off by default.
 - `--console series-s`: not run (`play.sh` passes no arguments to `victory run`).
 
 ## The intro videos go forwards and back (`VICTORY_JOIN_PARTS`)
