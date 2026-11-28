@@ -1133,6 +1133,20 @@ The `diag` profile with release's (runs 269 and 270, 420 s each, prison): 28.7 a
 within one pair's noise, for a build of 1 min 41 s instead of 18 s. Left as it is. Their
 Wine change is outside this tree.
 
+### What the refreshes' 4 ms are made of (`VICTORY_PROFILE`, run 271)
+
+Of a frame's ~8,500 copy refreshes in the prison, ~7,600 are known to copy nothing; the
+frame line gives them 4.2 ms of the submitting thread. Three lines elsewhere answer that
+case without walking the write watch's journal (dankxylese/leotux fb14fe9, 3cf376b:
+summaries per 64 MiB, 4 MiB and 64 KiB; pablogonz12/Scarlight 16c494e: a copy's refreshes
+as its runs, not their span; Raptorbk45 fdfb306: no lock for those that copy nothing).
+Sampled every 5 ms for 80 s (run 271, 30.3 ms a frame): the submitting thread is 75 % in
+ntdll, 58.6 % at one address (waiting for its helpers or the card); `Shadow::nothing_new`
+1.5 %, `watch::journal` 0.4 %, the journal's notes 0.2 %; `NtGetWriteWatch` under 4.6 %
+of its stacks. The walk those changes spare is about 2 % of the thread here (~0.5 ms a
+frame); the 4 ms is mostly the thread waiting for the refreshes done beside it. Not
+ported (1,500-2,000 lines in watch.rs, shadow.rs and host.rs, none applying as they are).
+
 ## Tools
 
 In `~/Games/victory-logs/tools/`, outside the repository (its policy takes no Python files):
