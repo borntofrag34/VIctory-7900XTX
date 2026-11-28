@@ -2,8 +2,9 @@
 
 ## Playability report: Linux, branch `linux-wine` (2026-11-28)
 
-**Played, on Linux under Proton, through Lucia's prison prologue and into the first
-mission, with a controlled character, at about 30 fps at 1920x1080.** One PC, one
+**Played, on Linux under Proton, through Lucia's prison prologue and into Jason's first
+mission (driving the boat after the plane), with a controlled character, at about 30 fps
+at 1920x1080.** One PC, one
 session (run 242, about 12 minutes of game time), started from a save in the prison
 cell. Ray tracing off. No game files are in this repository.
 
@@ -29,6 +30,14 @@ version played):
 6. **First mission: the hold-up of a cheque-cashing shop ("CAJERO")**, the clerk
    on his knees, the aiming tutorial on screen. Stopped there: the stand-in pad's left
    trigger did not satisfy the tutorial's aim step in this session.
+7. The game saved on; the next session (run 252) played on from there through the
+   cutscenes of the parole office, the arrest, and Jason's introduction (a man loading a
+   case into a car, the seaplane in the marshes, Jason and his partner on a boat).
+8. **Jason's first mission on the water:** the player drives the boat (minimap, compass,
+   objective "follow the plane", radio dialogue), with the wake, spray and sea drawn and
+   lit. Run aground twice in the mangrove from blind input; the game showed its own
+   "failed: the boat could not be driven" screen and the retry from the checkpoint,
+   which played on. Boat at 38.2 ms a frame (26 fps), its cutscenes 33.3 ms (30 fps).
 
 Frame times over the same session (median of the layer's report lines): the café
 cutscene 37.3 ms (27 fps), the prison 31.0 ms (32 fps), its corridors 26.9 ms (37 fps),
