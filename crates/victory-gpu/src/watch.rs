@@ -3078,7 +3078,7 @@ fn protect_alias(g: &Guards, block: usize, claims: Option<&mut Claims>) -> bool 
     if g.protected.contains(block) {
         return true;
     }
-    if g.left_alone(block) || g.rests(block, rest()) {
+    if g.left_alone(block) || g.rests(block, rest()) || crate::inplace::home_stays_writable(block * BLOCK, BLOCK) {
         return false;
     }
     // Ahead of the protection.
@@ -3112,6 +3112,31 @@ fn protect_alias(g: &Guards, block: usize, claims: Option<&mut Claims>) -> bool 
 fn protect_here(g: &Guards, from: usize, to: usize) {
     use windows_sys::Win32::System::Memory::{PAGE_READONLY, PAGE_READWRITE, VirtualProtect};
     let set = |from: usize, to: usize| {
+        if crate::inplace::home_stays_writable(from * BLOCK, (to - from) * BLOCK) {
+            // Never read-only, whatever range was asked about: the host may
+            // have a heap open on them, and the kernel refuses every
+            // submission of the process while a page of such a heap is
+            // read-only. Block by block then; these stay as they are, not
+            // clean, and are told as written at every asking.
+            //
+            // Some 100 s into a new story the title has a buffer that begins
+            // in the first 64 KiB of the address space and is 192 KiB long.
+            // Nothing is mapped in its first block, a hole the guards know by
+            // then, so the range is taken for a view with no question asked
+            // (`guard`); the other two blocks are the first pages of the
+            // title's 32-bit graphics memory, at home under Wine. Guarded,
+            // they lost the device at the next submission (2 runs of 2, the
+            // `mprotect` seen from outside; with this, none in 260 s).
+            static TOLD: std::sync::Once = std::sync::Once::new();
+            TOLD.call_once(|| {
+                tracing::warn!(
+                    start = format_args!("{:#x}", from * BLOCK),
+                    end = format_args!("{:#x}", to * BLOCK),
+                    "guards: asked to guard pages at home, which stay writable for the heap the host has on them (told once)"
+                );
+            });
+            return false;
+        }
         let mut old = 0;
         #[cfg(feature = "diagnostics")]
         let started = std::time::Instant::now();
@@ -4615,6 +4640,46 @@ mod tests {
             unsafe { (at as *mut u8).write_volatile(1) };
         }
         assert_eq!(refresh(), [early / PAGE, late / PAGE]);
+    }
+
+    /// Pages at home (under Wine the host may have a heap open on them) stay
+    /// writable when a range that begins in a hole the guards know reaches
+    /// into them, and are told as written at every asking.
+    #[test]
+    fn pages_at_home_are_never_made_read_only() {
+        use windows_sys::Win32::System::Memory::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS, VirtualQuery};
+        // SAFETY: a fresh reservation of three blocks; the last two are
+        // committed, the first stays a hole.
+        let p = unsafe {
+            let p = VirtualAlloc(std::ptr::null(), 3 * BLOCK, MEM_RESERVE, PAGE_NOACCESS) as usize;
+            assert_ne!(p, 0);
+            assert!(!VirtualAlloc((p + BLOCK) as *const _, 2 * BLOCK, MEM_COMMIT, PAGE_READWRITE).is_null());
+            p
+        };
+        forget_test_range(p, 3 * BLOCK);
+        let protection = |block: usize| {
+            // SAFETY: plain data filled in by the query.
+            let mut info: MEMORY_BASIC_INFORMATION = unsafe { std::mem::zeroed() };
+            // SAFETY: a valid out pointer of the right size.
+            assert_ne!(unsafe { VirtualQuery((p + block * BLOCK) as *const _, &mut info, size_of_val(&info)) }, 0);
+            info.Protect
+        };
+        // The hole alone: a view with its block absent, known from here on.
+        assert!(guard(p, p + BLOCK).is_some());
+        crate::inplace::title_memory_home(p + BLOCK, 2 * BLOCK, true);
+        let home = [p / BLOCK + 1, p / BLOCK + 2];
+        for _ in 0..2 {
+            let written = guard(p, p + 3 * BLOCK).expect("known for a view by its first block");
+            assert!(home.iter().all(|block| written.contains(block)), "{written:?}");
+            assert_eq!([protection(1), protection(2)], [PAGE_READWRITE; 2]);
+        }
+        assert!(!crate::inplace::home_stays_writable(p, BLOCK));
+        assert!(crate::inplace::home_stays_writable(p, BLOCK + 1));
+        crate::inplace::title_memory_home(p + BLOCK, 2 * BLOCK, false);
+        assert!(!crate::inplace::home_stays_writable(p, 3 * BLOCK));
+        forget_test_range(p, 3 * BLOCK);
+        // SAFETY: our reservation.
+        unsafe { VirtualFree(p as *mut _, 0, MEM_RELEASE) };
     }
 
     /// A range of view memory whose first block is not mapped is a view
