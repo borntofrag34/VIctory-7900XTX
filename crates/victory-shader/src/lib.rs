@@ -33,9 +33,10 @@ pub mod structure;
 /// Vice-Tay 3c83a33 and 4f2f58f); 0x4c00_0006: gfx10 decoder fixes from
 /// leotux (v_nop and friends no longer take a literal, v_cmpx writes EXEC,
 /// _g16 gradients packed, export target 16, annotateHandle not reused across
-/// blocks); upstream's own numbers
+/// blocks); 0x4c00_0007: a pixel program's killed lanes go on with their
+/// live quad (anoyarou d8d7473), 4,857 programs; upstream's own numbers
 /// stay below.)
-pub const TRANSLATOR_VERSION: u32 = 0x4c00_0006;
+pub const TRANSLATOR_VERSION: u32 = 0x4c00_0007;
 
 pub use dxbc::{Container, FourCC, Part};
 pub use dxil::{DxilProgram, ShaderKind, XboxExtras};

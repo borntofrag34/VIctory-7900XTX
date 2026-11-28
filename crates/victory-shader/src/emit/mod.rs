@@ -475,6 +475,11 @@ pub fn translate(container: &[u8]) -> Result<HostShader, ShaderError> {
         Err(ShaderError::Unsupported { what, .. }) if what == lower::MASK_ELSEWHERE => {
             lower::with_mask_ops_on_numbers(|| translate_plain(container))
         }
+        Err(e @ ShaderError::Unsupported { what, .. })
+            if what == "a constant lane mask" || what == "an opaque lane mask" =>
+        {
+            structure::without_quad_helpers(|| translate_plain(container)).map_err(|_| e)
+        }
         other => other,
     }
 }
