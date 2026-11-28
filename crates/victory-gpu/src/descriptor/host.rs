@@ -2695,6 +2695,14 @@ impl HostHeap {
     /// caller's to make null when it has let go of its own slot's lock
     /// ([`HostHeap::unmake_stale`]).
     fn note_buffer(&self, index: u32, view: Option<&View>, seen: bool) -> Vec<(u32, u64)> {
+        self.note_buffer_inner(index, view, seen, true)
+    }
+
+    /// [`HostHeap::note_buffer`]; `record_change` false: the slot is not put
+    /// back in [`HostHeap::buffer_changes`] (the heap pass, which mirrored it
+    /// itself). Nor is a slot a draw read through a table lately and
+    /// `seen` now: that draw makes it. (maren-halv/VIctory-Fast `7da8eb5`.)
+    fn note_buffer_inner(&self, index: u32, view: Option<&View>, seen: bool, record_change: bool) -> Vec<(u32, u64)> {
         if self.sampler {
             return Vec::new();
         }
@@ -2789,7 +2797,7 @@ impl HostHeap {
         } else {
             self.buffers.remove(index)
         };
-        if was {
+        if was && record_change && !(seen && self.copied_tabled(index, crate::frame::current())) {
             self.changed.put(index);
         }
         stale
@@ -3285,6 +3293,17 @@ impl HostHeap {
     /// views are made only for draws (`for_draw`), which also copy their
     /// data: a host copy of a buffer is made on first use.
     pub(crate) fn mirror(&self, index: u32, handle: u64, for_draw: bool) -> Option<View> {
+        self.mirror_inner(index, handle, for_draw, true)
+    }
+
+    /// [`HostHeap::mirror`] for a draw, by the heap pass (`draw::heap_buffer_pass`):
+    /// what it mirrors is not queued for its next round again.
+    /// (maren-halv/VIctory-Fast `7da8eb5`.)
+    pub(crate) fn mirror_heap_pass(&self, index: u32, handle: u64) -> Option<View> {
+        self.mirror_inner(index, handle, true, false)
+    }
+
+    fn mirror_inner(&self, index: u32, handle: u64, for_draw: bool, record_change: bool) -> Option<View> {
         if index >= self.count {
             // Diagnostic (NVIDIA heap cap): the highest title slot past the
             // host heap seen so far.
@@ -3324,10 +3343,10 @@ impl HostHeap {
                 self.quick_is(index, 0);
                 self.made.set(index, 0);
                 self.make_null(index);
-                let _ = self.note_buffer(index, None, false);
+                let _ = self.note_buffer_inner(index, None, false, record_change);
             } else if for_draw {
                 // Left for later and stale since: out of the sets and the stride table.
-                let _ = self.note_buffer(index, None, false);
+                let _ = self.note_buffer_inner(index, None, false, record_change);
             }
             return None;
         };
@@ -3336,7 +3355,7 @@ impl HostHeap {
             // are stale: their host slots read nothing from here on, and
             // let go of the host copies they held.
             // (When this slot's lock is let go: a lock at a time.)
-            let stale = self.note_buffer(index, Some(&view), for_draw);
+            let stale = self.note_buffer_inner(index, Some(&view), for_draw, record_change);
             // A view of a texture object that has no host copy yet waits
             // for it, as buffer views wait for a draw: the slot is made
             // when the texture is first used (`super::make_waiting`), or

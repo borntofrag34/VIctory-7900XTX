@@ -938,7 +938,7 @@ fn heap_buffer_pass(heap: &crate::descriptor::Heap, host: &crate::descriptor::ho
     let BufferSweep { passes, ranges, unwatched } = &mut *kept;
     let changed = host.buffer_changes();
     let all = *passes == 0 || (*passes % HEAP_ROUND == 0 && !heap_spread());
-    let slots = if all {
+    let mut slots = if all {
         ranges.0.clear();
         host.buffer_slots()
     } else if heap_spread() {
@@ -951,6 +951,9 @@ fn heap_buffer_pass(heap: &crate::descriptor::Heap, host: &crate::descriptor::ho
     } else {
         changed
     };
+    // A slot at most once a pass (maren-halv/VIctory-Fast `79a92c7`).
+    slots.sort_unstable();
+    slots.dedup();
     *passes += 1;
     // Whether the device was there before the pass: a view that removes
     // it is named below.
@@ -975,7 +978,7 @@ fn heap_buffer_pass(heap: &crate::descriptor::Heap, host: &crate::descriptor::ho
         if host.copied_tabled(index, frame) {
             return None;
         }
-        let view = host.mirror(index, heap.handle(index)?, true)?;
+        let view = host.mirror_heap_pass(index, heap.handle(index)?)?;
         // The copy the slot shows (`buffer_copy`), not the one the
         // view's range alone would find.
         let (shadow, address, len) = crate::descriptor::host::buffer_copy(&view)?;
