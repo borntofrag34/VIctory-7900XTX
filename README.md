@@ -39,10 +39,15 @@ some sixty measured runs since 2026-11-27. One launch on 2026-11-26 hung the GPU
 (amdgpu ring timeout); not seen since, cause not found.
 
 **Rendering, honestly:** faces, hair, skin, clothes, rooms and daylight streets are
-drawn and lit; FSR 4 at the output size keeps faces and fabric sharp. Known faults:
-characters' eyes glow white indoors, and in the shop the player character and bright
-surfaces are blown out to white (specular and light far too strong without ray
-tracing); some rooms are too dark; textures can arrive late after a scene change.
+drawn and lit; FSR 4 at the output size keeps faces and fabric sharp. Fixed since the
+playthrough (2026-11-28): **eyes and glasses no longer glow white indoors**. Without ray
+tracing, reflection rays found nothing and took the sky's light, 100 to 1,000 times the
+room's; they now take the room's light along the reflected direction
+(`VICTORY_AMBIENT_SPECULAR`, after VIctory-NVIDIA). And 4,213 shaders that branched the
+wrong way on two AMD compare instructions now take the right side (s_min/s_max, after
+Vice-Tay and leotux), which took the last glints out of the eyes. Still open: in bright
+interiors the player and lit surfaces can blow out to white, some rooms are too dark,
+and textures can arrive late after a scene change.
 
 Every figure is from `docs/linux-wine.md` on this branch, with the run behind it.
 
